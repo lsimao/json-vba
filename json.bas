@@ -1,3 +1,4 @@
+Attribute VB_Name = "JSON"
 'JSON to VBA parser and stringifier
 '2015-08-26, https://github.com/lsimao/json-vba/
 '
