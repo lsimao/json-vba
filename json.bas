@@ -1,6 +1,5 @@
-Attribute VB_Name = "JSON"
 'JSON to VBA parser and stringifier
-'2015-08-20, https://github.com/lsimao/json-vba/
+'2015-08-26, https://github.com/lsimao/json-vba/
 '
 'Mapping:
 '=============================================
@@ -96,11 +95,13 @@ Public Function Stringify(d) As String
     If Err.Number = 0 Then Exit Function
     On Error GoTo 0
     If (VarType(d) And vbArray) Or TypeName(d) = "Collection" Then
+        r = "["
         If VarType(d) And vbArray Then
             On Error Resume Next 'Handle zero-length arrays
             i = LBound(d)
             c = i - 1
             c = UBound(d)
+            On Error GoTo 0
         Else
             i = 1
             c = d.Count
@@ -108,8 +109,9 @@ Public Function Stringify(d) As String
         For i = i To c
             r = IIf(Len(r), r & ",", vbNullString) & Stringify(d(i))
         Next
-        r = "[" & r & "]"
+        r = r & "]"
     ElseIf VarType(d) = vbString Then
+        r = """"
         For i = 1 To Len(d)
             c = AscW(Mid(d, i, 1))
             Select Case c
@@ -127,21 +129,22 @@ Public Function Stringify(d) As String
                 r = r & ChrW(c)
             End Select
         Next
-        r = """" & r & """"
+        r = r & """"
     ElseIf VarType(d) = vbBoolean Then
         r = IIf(d, "true", "false")
     ElseIf IsNumeric(d) Then
-        r = Replace(d, Mid(1.3, 2, 1), ".")
+        r = LTrim(Replace(Replace(Str(d), "-.", "-0."), " .", "0.")) 'Trim spaces and prevent .x and -.x
     ElseIf IsDate(d) Then
-        r = Replace(CDbl(d), Mid(1.3, 2, 1), ".")
+        r = LTrim(Replace(Replace(Str(CDbl(d)), "-.", "-0."), " .", "0.")) 'Trim spaces and prevent .x and -.x
     ElseIf IsNull(d) Or IsEmpty(d) Or IsMissing(d) Then
         r = "null"
     ElseIf TypeName(d) = "Dictionary" Then
         v = d.keys
+        r = "{"
         For i = LBound(v) To UBound(v)
             r = IIf(i > LBound(v), r & ",", vbNullString) & Stringify(v(i)) & ":" & Stringify(d(v(i)))
         Next
-        r = "{" & r & "}"
+        r = r & "}"
     ElseIf IsObject(d) Then
         If d Is Nothing Then
             r = "null"
@@ -269,12 +272,10 @@ Private Function getValue(t As String, p As Long)
         Case "null": v = Null
         Case "true": v = True
         Case "false": v = False
-        Case Else
-            If IsNumeric(Replace(k, ".", Mid(1.3, 2, 1))) And (IsNumeric(Left(k, 1)) Or Left(k, 1) = "-") Then 'Exclude &H VB formats
-                v = Val(k)
-            Else
-                Err.Raise ERR_INVALID_VALUE, ERR_SRC, Replace(ERR_INVALID_VALUE_DESC, "%", p)
-            End If
+        Case Else 'Numeric ignoring -#.#E+# conformity.
+            On Error GoTo RaiseInvalidValue
+            v = Val(Replace(k, "&", vbNullString)) 'Ensure VB &H and &O formats are discarded!
+            On Error GoTo 0
         End Select
     End Select
     If IsObject(v) Then
@@ -283,8 +284,8 @@ Private Function getValue(t As String, p As Long)
         getValue = v
     End If
     Exit Function
-RaiseInvalidEscape:
-    Err.Raise ERR_INVALID_ESCAPE, ERR_SRC, Replace(ERR_INVALID_ESCAPE_DESC, "%", p)
+RaiseInvalidEscape: Err.Raise ERR_INVALID_ESCAPE, ERR_SRC, Replace(ERR_INVALID_ESCAPE_DESC, "%", p)
+RaiseInvalidValue: Err.Raise ERR_INVALID_VALUE, ERR_SRC, Replace(ERR_INVALID_VALUE_DESC, "%", p)
 End Function
 
 'Skip white spaces helper function
