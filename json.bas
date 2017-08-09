@@ -1,6 +1,5 @@
-Attribute VB_Name = "JSON"
 'JSON to VBA parser and stringifier
-'2015-08-26, https://github.com/lsimao/json-vba/
+'2017-08-09, https://github.com/lsimao/json-vba/
 '
 'Mapping:
 '=============================================
@@ -108,7 +107,7 @@ Public Function Stringify(d) As String
             c = d.Count
         End If
         For i = i To c
-            r = IIf(Len(r), r & ",", vbNullString) & Stringify(d(i))
+            r = r & IIf(Len(r) > 1, ",", vbNullString) & Stringify(d(i))
         Next
         r = r & "]"
     ElseIf VarType(d) = vbString Then
@@ -143,7 +142,7 @@ Public Function Stringify(d) As String
         v = d.keys
         r = "{"
         For i = LBound(v) To UBound(v)
-            r = IIf(i > LBound(v), r & ",", vbNullString) & Stringify(v(i)) & ":" & Stringify(d(v(i)))
+            r = r & IIf(i > LBound(v), ",", vbNullString) & Stringify(v(i)) & ":" & Stringify(d(v(i)))
         Next
         r = r & "}"
     ElseIf IsObject(d) Then
@@ -159,11 +158,11 @@ Public Function Stringify(d) As String
 End Function
 
 'Helper function, used to assign either objects or values in a single statement
-Public Sub Assign(ByRef Target As Variant, Source)
-    If IsObject(Source) Then
-        Set Target = Source
+Public Sub Assign(ByRef Target As Variant, source)
+    If IsObject(source) Then
+        Set Target = source
     Else
-        Target = Source
+        Target = source
     End If
 End Sub
 
@@ -184,7 +183,7 @@ Private Function getValue(t As String, p As Long)
                 If Mid(t, p, 1) <> ":" Then Err.Raise ERR_UNEXPECTED_TOKEN, ERR_SRC, Replace(ERR_UNEXPECTED_TOKEN_DESC, "%", p)
                 skipWS t, p, 1
                 If v.exists(k) Then v.Remove k
-                v.Add k, getValue(t, p)
+                v.add k, getValue(t, p)
                 skipWS t, p
                 Select Case Mid(t, p, 1)
                 Case "}" 'Last pair
@@ -200,18 +199,20 @@ Private Function getValue(t As String, p As Long)
             p = p + 1
         End If
     Case "["
-        ReDim v(0 To 0)
+        'ReDim v(0 To 0)
+        v = Array()
         skipWS t, p, 1
         If Mid(t, p, 1) = "]" Then
             'Empty array
-            Erase v
+            'Erase v
+            p = p + 1
         Else
             Do
+                ReDim Preserve v(0 To UBound(v) + 1)
                 Assign v(UBound(v)), getValue(t, p)
                 skipWS t, p
                 Select Case Mid(t, p, 1)
                 Case ","
-                    ReDim Preserve v(0 To UBound(v) + 1)
                     skipWS t, p, 1
                 Case "]" 'Last element
                     p = p + 1
@@ -275,7 +276,7 @@ Private Function getValue(t As String, p As Long)
         Case "false": v = False
         Case Else 'Numeric ignoring -#.#E+# conformity.
             On Error GoTo RaiseInvalidValue
-            v = Val(Replace(k, "&", vbNullString)) 'Ensure VB &H and &O formats are discarded!
+            v = val(Replace(k, "&", vbNullString)) 'Ensure VB &H and &O formats are discarded!
             On Error GoTo 0
         End Select
     End Select
